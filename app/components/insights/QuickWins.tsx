@@ -1,33 +1,27 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { Modal } from 'antd';
+import { useState } from 'react';
+import { Modal, Card } from 'antd';
+
+interface GSCDataItem {
+  type: string;
+  title: string;
+  description: string;
+  recommendations: string[];
+}
 
 interface QuickWinsProps {
-  data: Array<{
-    keyword: string;
-    specificAction: string;
-    currentMetrics: {
-      position: number;
-      impressions: number;
-      currentClicks: number;
-    };
-    opportunity: {
-      potentialTraffic: number;
-      trafficIncrease: number;
-      effort: string;
-    };
-  }>;
+  data: GSCDataItem[];
 }
 
 export default function QuickWins({ data }: QuickWinsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<typeof data[0] | null>(null);
+  const [selectedItem, setSelectedItem] = useState<GSCDataItem | null>(null);
 
-  const handleUseThis = (keyword: string) => {
-    const textarea = document.querySelector('textarea[placeholder="What would you like to share?"]') as HTMLTextAreaElement;
+  const handleUseThis = (recommendation: string) => {
+    const textarea = document.querySelector('textarea[placeholder="Start writing your content here..."]') as HTMLTextAreaElement;
     if (textarea) {
-      textarea.value = keyword;
+      textarea.value = recommendation;
       textarea.focus();
       textarea.style.borderImage = 'linear-gradient(to right, #4F46E5, #06B6D4) 1';
       textarea.style.borderStyle = 'solid';
@@ -35,7 +29,7 @@ export default function QuickWins({ data }: QuickWinsProps) {
     }
   };
 
-  const showDetails = (item: typeof data[0]) => {
+  const showDetails = (item: GSCDataItem) => {
     setSelectedItem(item);
     setIsModalOpen(true);
   };
@@ -43,76 +37,59 @@ export default function QuickWins({ data }: QuickWinsProps) {
   return (
     <div className="space-y-4">
       {data.map((item, i) => (
-        <div key={i} className="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-blue-100">
-          <div className="flex justify-between items-center">
-            <h4 className="font-medium text-gray-900">{item.keyword}</h4>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleUseThis(item.keyword)}
-                className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-              >
-                Use This
-              </button>
-              <button
-                onClick={() => showDetails(item)}
-                className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-              >
-                Details
-              </button>
-            </div>
+        <Card
+          key={i}
+          className="hover:shadow-md transition-shadow duration-200"
+          styles={{ body: { padding: '16px', background: 'linear-gradient(to right, #EEF2FF, #E0E7FF)' } }}
+        >
+          <div className="flex flex-col space-y-3">
+            <h4 className="font-medium text-gray-900">{item.title}</h4>
+            <p className="text-sm text-gray-700">{item.description}</p>
+            <ul className="space-y-1 text-sm text-gray-600 list-disc pl-5">
+              {item.recommendations.map((rec, idx) => (
+                <li key={idx} className="flex justify-between items-start">
+                  <span>{rec}</span>
+                  <button
+                    onClick={() => handleUseThis(rec)}
+                    className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  >
+                    Use This
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button
+              onClick={() => showDetails(item)}
+              className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+            >
+              Details
+            </button>
           </div>
-        </div>
+        </Card>
       ))}
 
       <Modal
-        title={<div className="text-xl font-semibold text-gray-800 border-b pb-3">{selectedItem?.keyword}</div>}
+        title={
+          <div className="text-xl font-semibold text-gray-800 border-b pb-3">
+            {selectedItem?.title}
+          </div>
+        }
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
         className="max-w-2xl"
-        bodyStyle={{ padding: '24px' }}
+        styles={{ body: { padding: '24px' } }}
       >
         {selectedItem && (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
-              <p className="text-gray-700 text-lg">{selectedItem.specificAction}</p>
+              <p className="text-gray-700 text-lg">{selectedItem.description}</p>
             </div>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                <h5 className="text-lg font-semibold text-gray-800 mb-3">Current Metrics</h5>
-                <ul className="space-y-2 text-gray-600">
-                  <li className="flex justify-between items-center">
-                    <span>Position:</span>
-                    <span className="font-medium">{selectedItem.currentMetrics.position.toFixed(1)}</span>
-                  </li>
-                  <li className="flex justify-between items-center">
-                    <span>Impressions:</span>
-                    <span className="font-medium">{selectedItem.currentMetrics.impressions}</span>
-                  </li>
-                  <li className="flex justify-between items-center">
-                    <span>Current Clicks:</span>
-                    <span className="font-medium">{selectedItem.currentMetrics.currentClicks}</span>
-                  </li>
-                </ul>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-                <h5 className="text-lg font-semibold text-gray-800 mb-3">Potential Impact</h5>
-                <ul className="space-y-2 text-gray-600">
-                  <li className="flex justify-between items-center">
-                    <span>Potential Traffic:</span>
-                    <span className="font-medium text-green-600">{selectedItem.opportunity.potentialTraffic}</span>
-                  </li>
-                  <li className="flex justify-between items-center">
-                    <span>Traffic Increase:</span>
-                    <span className="font-medium text-green-600">+{selectedItem.opportunity.trafficIncrease}</span>
-                  </li>
-                  <li className="flex justify-between items-center">
-                    <span>Effort Level:</span>
-                    <span className="font-medium text-blue-600">{selectedItem.opportunity.effort}</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+            <ul className="space-y-2 text-gray-600 list-disc pl-5">
+              {selectedItem.recommendations.map((rec, idx) => (
+                <li key={idx}>{rec}</li>
+              ))}
+            </ul>
           </div>
         )}
       </Modal>

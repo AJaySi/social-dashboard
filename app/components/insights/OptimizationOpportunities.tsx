@@ -1,6 +1,6 @@
 'use client';
 
-import { Card, Progress, Tag, Tooltip } from 'antd';
+import { Card, Tag, Tooltip } from 'antd';
 import { ArrowUpOutlined } from '@ant-design/icons';
 
 interface OptimizationOpportunitiesProps {
@@ -9,7 +9,7 @@ interface OptimizationOpportunitiesProps {
     currentPosition: number;
     impressions: number;
     potentialTraffic: number;
-    opportunity: {
+    opportunity?: {
       trafficGain: number;
       effort: string;
       impactPotential: string;
@@ -19,7 +19,7 @@ interface OptimizationOpportunitiesProps {
 }
 
 export default function OptimizationOpportunities({ data }: OptimizationOpportunitiesProps) {
-  const getEffortColor = (effort: string) => {
+  const getEffortColor = (effort: string = 'medium') => {
     switch (effort.toLowerCase()) {
       case 'low':
         return 'green';
@@ -32,7 +32,7 @@ export default function OptimizationOpportunities({ data }: OptimizationOpportun
     }
   };
 
-  const getImpactColor = (impact: string) => {
+  const getImpactColor = (impact: string = 'medium') => {
     switch (impact.toLowerCase()) {
       case 'high':
         return 'green';
@@ -55,13 +55,13 @@ export default function OptimizationOpportunities({ data }: OptimizationOpportun
                 <h4 className="text-lg font-semibold text-gray-800 mb-1">{item.keyword}</h4>
                 <div className="flex gap-2 mb-2">
                   <Tooltip title="Required effort level">
-                    <Tag color={getEffortColor(item.opportunity.effort)}>
-                      {item.opportunity.effort.toUpperCase()} EFFORT
+                    <Tag color={getEffortColor(item.opportunity?.effort)}>
+                      {(item.opportunity?.effort || 'MEDIUM').toUpperCase()} EFFORT
                     </Tag>
                   </Tooltip>
                   <Tooltip title="Potential impact on traffic">
-                    <Tag color={getImpactColor(item.opportunity.impactPotential)}>
-                      {item.opportunity.impactPotential.toUpperCase()} IMPACT
+                    <Tag color={getImpactColor(item.opportunity?.impactPotential)}>
+                      {(item.opportunity?.impactPotential || 'MEDIUM').toUpperCase()} IMPACT
                     </Tag>
                   </Tooltip>
                 </div>
@@ -78,14 +78,14 @@ export default function OptimizationOpportunities({ data }: OptimizationOpportun
               <Tooltip title="Current monthly impressions">
                 <div className="text-center p-2 bg-gray-50 rounded">
                   <div className="text-sm text-gray-500">Impressions</div>
-                  <div className="text-lg font-semibold">{item.impressions.toLocaleString()}</div>
+                  <div className="text-lg font-semibold">{(item.impressions || 0).toLocaleString()}</div>
                 </div>
               </Tooltip>
               <Tooltip title="Potential monthly traffic">
                 <div className="text-center p-2 bg-gray-50 rounded">
                   <div className="text-sm text-gray-500">Potential Traffic</div>
                   <div className="text-lg font-semibold text-green-600">
-                    {item.potentialTraffic.toLocaleString()}
+                    {(item.potentialTraffic || 0).toLocaleString()}
                   </div>
                 </div>
               </Tooltip>
@@ -94,7 +94,7 @@ export default function OptimizationOpportunities({ data }: OptimizationOpportun
                   <div className="text-sm text-gray-500">Traffic Gain</div>
                   <div className="text-lg font-semibold text-green-600 flex items-center justify-center">
                     <ArrowUpOutlined className="mr-1" />
-                    {item.opportunity.trafficGain.toLocaleString()}
+                    {(item.opportunity?.trafficGain || 0).toLocaleString()}
                   </div>
                 </div>
               </Tooltip>

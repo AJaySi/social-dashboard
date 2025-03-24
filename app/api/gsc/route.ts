@@ -1,7 +1,6 @@
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]/route';
 import { google } from 'googleapis';
-import { GaxiosResponse } from 'googleapis-common';
 import { webmasters_v3 } from 'googleapis';
 import { NextResponse } from 'next/server';
 

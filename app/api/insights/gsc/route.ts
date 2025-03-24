@@ -144,6 +144,11 @@ function generateInsights(searchData: SearchAnalyticsRow[]): InsightData[] {
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
+    console.log('GSC API - Session state:', {
+      isAuthenticated: !!session,
+      provider: session?.provider,
+      hasAccessToken: !!session?.accessToken
+    });
 
     if (!session?.accessToken || session.provider !== 'google') {
       return NextResponse.json(
@@ -159,8 +164,10 @@ export async function GET() {
     );
     
     auth.setCredentials({ access_token: session.accessToken });
+    console.log('GSC API - OAuth2 client initialized');
 
     const { data: siteList } = await webmasters.sites.list({ auth });
+    console.log('GSC API - Site list:', siteList);
 
     if (!siteList.siteEntry?.length) {
       return NextResponse.json(
@@ -175,6 +182,12 @@ export async function GET() {
       .toISOString()
       .split('T')[0];
 
+    console.log('GSC API - Fetching search analytics:', {
+      siteUrl,
+      startDate,
+      endDate
+    });
+
     const response = await webmasters.searchanalytics.query({
       auth: auth,
       siteUrl: siteUrl,
@@ -182,11 +195,13 @@ export async function GET() {
         startDate: startDate,
         endDate: endDate,
         dimensions: ['query'],
-        rowLimit: 100 // Increased limit for better analysis
+        rowLimit: 100
       }
     } as webmasters_v3.Params$Resource$Searchanalytics$Query);
 
+    console.log('GSC API - Search analytics response:', response.data);
     const insights = generateInsights(response.data.rows || []);
+    console.log('GSC API - Generated insights:', insights);
 
     return NextResponse.json({
       success: true,
@@ -195,7 +210,7 @@ export async function GET() {
     });
 
   } catch (error) {
-    console.error('Error generating GSC insights:', error);
+    console.error('GSC API - Error:', error);
     return NextResponse.json(
       { 
         error: 'Failed to generate insights. Please try again later.',

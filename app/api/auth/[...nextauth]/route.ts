@@ -82,33 +82,83 @@ export const authOptions: AuthOptions = {
         // Check if the token is expired
         if (Date.now() >= token.accessTokenExpires) {
           try {
-            // If we have a refresh token, attempt to refresh the access token
-            if (token.refreshToken && process.env.GOOGLE_ID && process.env.GOOGLE_SECRET) {
-              const response = await fetch('https://oauth2.googleapis.com/token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                  client_id: process.env.GOOGLE_ID,
-                  client_secret: process.env.GOOGLE_SECRET,
-                  grant_type: 'refresh_token',
-                  refresh_token: token.refreshToken as string,
-                }),
-              });
+            // If we have a refresh token, attempt to refresh the access token based on provider
+            if (token.refreshToken) {
+              let response;
+              let tokens;
+              
+              switch(token.provider) {
+                case 'google':
+                  if (!process.env.GOOGLE_ID || !process.env.GOOGLE_SECRET) {
+                    throw new Error('Missing Google credentials');
+                  }
+                  
+                  response = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                      client_id: process.env.GOOGLE_ID,
+                      client_secret: process.env.GOOGLE_SECRET,
+                      grant_type: 'refresh_token',
+                      refresh_token: token.refreshToken as string,
+                    }),
+                  });
+                  break;
+                  
+                case 'facebook':
+                  if (!process.env.FACEBOOK_ID || !process.env.FACEBOOK_SECRET) {
+                    throw new Error('Missing Facebook credentials');
+                  }
+                  
+                  response = await fetch('https://graph.facebook.com/v18.0/oauth/access_token', {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                      grant_type: 'fb_exchange_token',
+                      client_id: process.env.FACEBOOK_ID,
+                      client_secret: process.env.FACEBOOK_SECRET,
+                      fb_exchange_token: token.refreshToken as string,
+                    }),
+                  });
+                  break;
+                  
+                case 'linkedin':
+                  if (!process.env.LINKEDIN_ID || !process.env.LINKEDIN_SECRET) {
+                    throw new Error('Missing LinkedIn credentials');
+                  }
+                  
+                  response = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                      grant_type: 'refresh_token',
+                      client_id: process.env.LINKEDIN_ID,
+                      client_secret: process.env.LINKEDIN_SECRET,
+                      refresh_token: token.refreshToken as string,
+                    }),
+                  });
+                  break;
+                  
+                default:
+                  throw new Error(`Unsupported provider: ${token.provider}`);
+              }
 
-              const tokens = await response.json();
+              tokens = await response.json();
 
               if (!response.ok) throw tokens;
 
-              console.log('Successfully refreshed access token');
+              console.log(`Successfully refreshed access token for ${token.provider}`);
               
               return {
                 ...token,
                 accessToken: tokens.access_token,
                 accessTokenExpires: Date.now() + (tokens.expires_in * 1000),
+                // Update refresh token if a new one was provided
+                refreshToken: tokens.refresh_token || token.refreshToken,
               };
             }
           } catch (error) {
-            console.error('Error refreshing access token:', error);
+            console.error(`Error refreshing ${token.provider} access token:`, error);
             return { ...token, error: 'RefreshAccessTokenError' };
           }
         }
@@ -141,7 +191,7 @@ export const authOptions: AuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   pages: {
     error: '/auth/error',
-    signIn: '/',
+    signIn: '/auth/signin',
   },
 };
 

@@ -1,101 +1,297 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { useSession, signIn } from 'next-auth/react';
+import { Toaster, toast } from 'react-hot-toast';
+import Image from 'next/image';
+import RightSidebar from './components/RightSidebar';
+import SearchConsoleData from './components/SearchConsoleData';
+import BlogTitleSuggestions from './components/BlogTitleSuggestions';
+import SearchQuerySuggestions from './components/SearchQuerySuggestions';
+import CombinedResults from './components/CombinedResults';
+import ContentPreview from './components/ContentPreview';
+import ContentOutlineGenerator from './components/ContentOutlineGenerator';
+import { useRouter } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [showContextMenu, setShowContextMenu] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Handle image upload logic here
+      console.log('Image uploaded:', file);
+      // You can implement actual image upload functionality here
+    }
+  };
+
+  const [content, setContent] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { data: session } = useSession();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showAskButton, setShowAskButton] = useState(false);
+  const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const [isSearchQueryModalOpen, setIsSearchQueryModalOpen] = useState(false);
+  const [selectedQuery, setSelectedQuery] = useState<string | null>(null);
+  const [selectedTitle, setSelectedTitle] = useState<string | null>(null);
+  const [outline, setOutline] = useState<any[]>([]);
+  const [gscInsights, setGscInsights] = useState<any[]>([]);
+  const [showContentPreview, setShowContentPreview] = useState(false);
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setContent(newContent);
+    setShowAskButton(newContent.trim().length > 0);
+  };
+
+  const handleAskALwrity = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/suggestions/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI suggestions');
+      }
+
+      const suggestions = await response.json();
+      // Pass suggestions to the modal component
+      setIsAskModalOpen(true);
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error getting AI suggestions:', error);
+      toast.error('Failed to get AI suggestions. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectTitle = (title: string) => {
+    setContent(title);
+    setSelectedTitle(title);
+    setIsAskModalOpen(false);
+  };
+
+  const handleSelectQuery = (query: string) => {
+    setSelectedQuery(query);
+    setIsSearchQueryModalOpen(false);
+  };
+
+  const router = useRouter();
+
+  const handleNextClick = () => {
+    if (content.trim().length > 0) {
+      setIsSearchQueryModalOpen(true);
+    } else {
+      toast.error('Please enter a blog title first');
+    }
+  };
+
+  const handleBackToEditor = () => {
+    setSelectedQuery(null);
+    setShowContentPreview(false);
+  };
+
+  const handleConfirmOutline = () => {
+    setShowContentPreview(true);
+  };
+
+  const handleGenerateContent = async (sectionId: string, context: { 
+    title: string, 
+    keywords: string[], 
+    type: string,
+    previousContent?: string,
+    nextContent?: string,
+    globalContext?: {
+      title: string,
+      outline: Array<{ title: string, keywords: string[] }>
+    }
+  }) => {
+    try {
+      const response = await fetch('/api/content/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...context,
+          estimatedWordCount: outline.find(section => section.id === sectionId)?.estimatedWordCount
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const data = await response.json();
+      const updatedOutline = outline.map(section =>
+        section.id === sectionId ? { ...section, content: data.content } : section
+      );
+      setOutline(updatedOutline);
+      return data.content;
+    } catch (error) {
+      console.error('Error generating content:', error);
+      throw error;
+    }
+  };
+
+  return (
+    <main className="flex min-h-screen relative overflow-hidden bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 animate-gradient-shift">
+      <Toaster position="top-right" />
+      <div className="flex-1 p-8 max-w-[calc(100%-320px)] relative z-10">
+        <div className="max-w-4xl mx-auto space-y-6 backdrop-blur-lg bg-white/10 rounded-xl p-8 shadow-2xl border border-white/20 animate-fade-in">
+          {!selectedQuery ? (
+            <div className="relative">
+              <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">Start Your Blog Now</h1>
+              <br></br>
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  className="
+                    w-full p-4 min-h-[200px] border border-gray-600 rounded-2xl shadow-md 
+                    bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 text-white 
+                    placeholder-gray-400 resize-none focus:outline-none focus:ring-4 
+                    focus:ring-blue-400/70 focus:border-transparent relative 
+                    before:content-[''] before:absolute before:inset-0 before:rounded-2xl 
+                    before:border before:border-blue-400/30 before:animate-glow 
+                    before:bg-gradient-to-r before:from-blue-500/10 before:via-purple-500/10 
+                    before:to-pink-500/10
+                    after:content-[''] after:absolute after:inset-0 after:rounded-2xl 
+                    after:border after:border-blue-400/20 after:animate-shimmer 
+                    after:bg-gradient-to-br after:from-blue-400/20 after:to-purple-400/20
+                    hover:shadow-lg hover:shadow-blue-500/40 focus:shadow-xl 
+                    focus:shadow-blue-500/60 transition-all duration-300 
+                    [&:not(:focus)]:hover:border-blue-500/40 [&:not(:focus)]:hover:shadow-lg
+                  "
+                  placeholder="Write your blog or enter keywords and ask Alwrity..."
+                  aria-label="Blog writing text area"
+                  value={content}
+                  onChange={handleContentChange}
+                />
+                <div className="absolute bottom-4 left-4 flex items-center space-x-4 text-gray-400">
+                  <div className="relative">
+                    <button 
+                      className="flex items-center space-x-1 opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      <span># Context</span>
+                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Beta</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <label className="flex items-center space-x-1 opacity-50 cursor-not-allowed">
+                      <Image src="/favicon.ico" width={16} height={16} alt="Images" />
+                      <span>Images</span>
+                      <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">Beta</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between mt-4">
+                <button
+                  onClick={() => router.push('/content-ideator')}
+                  className="flex items-center px-6 py-2 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-md hover:from-blue-500 hover:to-purple-500 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 mr-4"
+                >
+                  ALwrity Content AIdeator
+                </button>
+                {content.trim().length > 0 && (
+                  <button
+                    onClick={handleNextClick}
+                    className="flex items-center px-6 py-2 bg-gradient-to-r from-green-400 to-green-600 text-white rounded-md hover:from-green-500 hover:to-green-700 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105"
+                  >
+                    Next: Get Search Query Suggestions
+                  </button>
+                )}
+                {showAskButton && (
+                  <button
+                    onClick={handleAskALwrity}
+                    className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-md hover:from-blue-500 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 ml-auto"
+                  >
+                    <Image
+                      src="/favicon.ico"
+                      alt="ALwrity"
+                      width={20}
+                      height={20}
+                      className="mr-2 opacity-90"
+                    />
+                    Ask ALwrity
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="w-full">
+              {selectedQuery && !showContentPreview ? (
+                <CombinedResults
+                  query={selectedQuery}
+                  onBack={handleBackToEditor}
+                />
+              ) : showContentPreview ? (
+                <div className="space-y-4">
+                  <ContentOutlineGenerator
+                    selectedTitle={selectedTitle}
+                    selectedQuery={selectedQuery}
+                    gscInsights={gscInsights}
+                    onOutlineGenerated={setOutline}
+                  />
+                  <div className="flex justify-between mt-6">
+                    <button
+                      onClick={handleBackToEditor}
+                      className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={handleConfirmOutline}
+                      className="px-6 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-md hover:from-blue-500 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg"
+                    >
+                      Confirm & Generate Content
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex justify-end mb-4">
+                    <button
+                      onClick={() => setShowContentPreview(false)}
+                      className="px-6 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-md hover:from-blue-500 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg flex items-center"
+                    >
+                      <span className="mr-2">←</span> Back to Outline
+                    </button>
+                  </div>
+                  <ContentPreview 
+                    outline={outline} 
+                    onGenerateContent={handleGenerateContent}
+                    onContentUpdate={async (sectionId, newContent) => {
+                      const updatedOutline = outline.map(section =>
+                        section.id === sectionId ? { ...section, content: newContent } : section
+                      );
+                      setOutline(updatedOutline);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+      <SearchConsoleData insights={[]} />
+      
+      <BlogTitleSuggestions
+        isOpen={isAskModalOpen}
+        onClose={() => setIsAskModalOpen(false)}
+        onSelectTitle={handleSelectTitle}
+        currentContent={content}
+        gscInsights={[]}
+      />
+      
+      <SearchQuerySuggestions
+        isOpen={isSearchQueryModalOpen}
+        onClose={() => setIsSearchQueryModalOpen(false)}
+        onSelectQuery={handleSelectQuery}
+        currentContent={content}
+        gscInsights={[]}
+      />
+    </main>
   );
 }

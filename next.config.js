@@ -1,10 +1,21 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {},
+  // Configure output directory
+  distDir: '.next',
+  // Configure file tracing
+  outputFileTracingIncludes: {
+    '*': ['./build/**/*']
+  },
   // Configure environment variables
-  env: {
+  env: {  
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
+  },
+  // Configure runtime config
+  publicRuntimeConfig: {
+    FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
   },
   // Configure images domains for profile pictures
   images: {
