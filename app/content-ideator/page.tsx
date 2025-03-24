@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import InsightsPanel from '../components/insights/InsightsPanel';
+import ContentIdeasCarousel from '../components/ContentIdeasCarousel';
 
 interface Insights {
   quick_wins: Array<{
