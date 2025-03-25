@@ -129,7 +129,7 @@ export default function CombinedResults({ query, onBack }: CombinedResultsProps)
       setError(null);
       
       try {
-        const response = await fetch(`/api/insights/combined?query=${encodeURIComponent(query)}`);
+        const response = await fetch(`/api/insights/combined?q=${encodeURIComponent(query)}`);
         if (!response.ok) throw new Error('Failed to fetch insights');
         
         const result = await response.json();
@@ -466,7 +466,35 @@ export default function CombinedResults({ query, onBack }: CombinedResultsProps)
           }
 
           if (response.status === 429) {
-            throw new Error(`Rate limit exceeded. Please try again in ${errorData.retryAfter || 60} seconds`);
+            const retryAfter = errorData.retryAfter || 60;
+            setError(`Rate limit exceeded. Retrying automatically in ${retryAfter} seconds...`);
+            setLoadingMessage(`Waiting for rate limit to reset (${retryAfter}s)`);
+            setLoadingProgress(0);
+            
+            // Set up a countdown timer with progress bar
+            let countdown = retryAfter;
+            const totalTime = retryAfter;
+            const countdownInterval = setInterval(() => {
+              countdown -= 1;
+              // Update progress bar to show countdown progress
+              const progressPercent = Math.round(((totalTime - countdown) / totalTime) * 100);
+              setLoadingProgress(progressPercent);
+              
+              if (countdown <= 0) {
+                clearInterval(countdownInterval);
+                // Auto-retry when countdown reaches zero
+                if (isSubscribed) {
+                  setError(null);
+                  setLoadingMessage('Retrying request...');
+                  fetchCombinedInsights();
+                }
+              } else {
+                setError(`Rate limit exceeded. Retrying automatically in ${countdown} seconds...`);
+                setLoadingMessage(`Waiting for rate limit to reset (${countdown}s)`);
+              }
+            }, 1000);
+            
+            return; // Exit the function without throwing an error
           } else if (response.status === 503) {
             throw new Error('External service is temporarily unavailable. Please try again later');
           } else if (response.status === 401) {
@@ -537,7 +565,8 @@ export default function CombinedResults({ query, onBack }: CombinedResultsProps)
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...context,
-            estimatedWordCount: generatedOutline.find((sec) => sec.id === sectionId)?.estimatedWordCount
+            estimatedWordCount: generatedOutline.find((sec) => sec.id === sectionId)?.estimatedWordCount,
+            provider: (process.env.DEFAULT_AI_PROVIDER || 'gemini') as 'openai' | 'gemini'
           })
         });
 

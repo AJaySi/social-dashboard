@@ -1,9 +1,18 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodResponseFormat } from 'openai/helpers/zod';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
-if (!process.env.OPENAI_API_KEY) {
+// Check for required environment variables based on provider
+const provider = (process.env.DEFAULT_AI_PROVIDER || 'openai') as 'openai' | 'gemini';
+
+if (provider === 'openai' && !process.env.OPENAI_API_KEY) {
   console.error('Error: OPENAI_API_KEY environment variable is missing.');
+  process.exit(1);
+}
+
+if (provider === 'gemini' && !process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+  console.error('Error: NEXT_PUBLIC_GEMINI_API_KEY environment variable is missing.');
   process.exit(1);
 }
 
@@ -11,6 +20,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   dangerouslyAllowBrowser: true
 });
+
+const gemini = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
 interface SearchMetrics {
   clicks: number;
@@ -42,6 +53,7 @@ interface GenerateOutlineParams {
   blogTitle?: string;
   gscInsights: ContentGap[];
   serpData?: SerpData;
+  provider?: 'openai' | 'gemini';
 }
 
 interface OutlineSection {
@@ -52,7 +64,7 @@ interface OutlineSection {
   keyPoints: string[];
   sectionType: 'introduction' | 'body' | 'conclusion' | 'faq' | 'case_study';
   optimizationScore: number;
-  type?: 'introduction' | 'body' | 'conclusion' | 'faq' | 'case_study' | 'content';
+  type: 'introduction' | 'body' | 'conclusion' | 'faq' | 'case_study' | 'content';
   content?: string;
 }
 
@@ -145,6 +157,113 @@ Ensure the outline:
   return prompt;
 }
 
+async function generateWithOpenAI(prompt: string): Promise<OutlineSection[]> {
+  const completion = await openai.beta.chat.completions.parse({
+    model: 'gpt-4o-mini-2024-07-18',
+    messages: [
+      { 
+        role: 'system', 
+        content: 'You are an expert content strategist and SEO specialist. Create detailed blog outlines that are data-driven, comprehensive, and optimized for both search engines and user intent.'
+      },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.7,
+    max_tokens: 2000,
+    response_format: zodResponseFormat(BlogOutlineSchema, 'outline')
+  });
+
+  if (!completion.choices[0]?.message?.parsed?.outline) {
+    throw new Error('Invalid response format from OpenAI API');
+  }
+
+  const sections = completion.choices[0].message.parsed.outline;
+  
+  return sections.map((section: z.infer<typeof OutlineSectionSchema>, index: number) => ({
+    id: `section-${index + 1}`,
+    title: section.title || 'Untitled Section',
+    keywords: section.keywords || [],
+    estimatedWordCount: section.wordCount || section.word_count || 300,
+    keyPoints: section.keyPoints || section.key_points || [],
+    sectionType: section.sectionType || section.section_type || 'body',
+    optimizationScore: section.optimizationScore || section.optimization_score || 70
+  }));
+}
+
+async function generateWithGemini(prompt: string): Promise<OutlineSection[]> {
+  const schema = {
+    type: SchemaType.OBJECT,
+    properties: {
+      outline: {
+        type: SchemaType.ARRAY,
+        items: {
+          type: SchemaType.OBJECT,
+          properties: {
+            title: { 
+              type: SchemaType.STRING,
+              description: "Clear and engaging section heading"
+            },
+            keywords: { 
+              type: SchemaType.ARRAY, 
+              items: { 
+                type: SchemaType.STRING
+              },
+              description: "List of target keywords to include"
+            },
+            wordCount: { 
+              type: SchemaType.NUMBER,
+              description: "Estimated length based on topic depth"
+            },
+            keyPoints: { 
+              type: SchemaType.ARRAY, 
+              items: { 
+                type: SchemaType.STRING
+              },
+              description: "Main points to cover in bullet form"
+            },
+            sectionType: { 
+              type: SchemaType.STRING,
+              description: "One of [introduction, body, conclusion, faq, case_study]"
+            },
+            optimizationScore: { 
+              type: SchemaType.NUMBER,
+              description: "0-100 based on search intent match"
+            }
+          },
+          required: ["title", "keywords"]
+        }
+      }
+    },
+    required: ["outline"]
+  };
+
+  const model = gemini.getGenerativeModel({
+    model: 'gemini-1.5-pro',
+    systemInstruction: 'You are an expert content strategist and SEO specialist. Create detailed blog outlines that are data-driven, comprehensive, and optimized for both search engines and user intent.',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: schema
+    }
+  });
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const content = JSON.parse(response.text());
+  
+  if (!content.outline || !Array.isArray(content.outline)) {
+    throw new Error('Invalid response format from Gemini API');
+  }
+
+  return content.outline.map((section: any, index: number) => ({
+    id: `section-${index + 1}`,
+    title: section.title || 'Untitled Section',
+    keywords: section.keywords || [],
+    estimatedWordCount: section.wordCount || 300,
+    keyPoints: section.keyPoints || [],
+    sectionType: section.sectionType || 'body',
+    optimizationScore: section.optimizationScore || 70
+  }));
+}
+
 export async function generateBlogOutline(params: GenerateOutlineParams): Promise<OutlineSection[]> {
   try {
     const cacheKey = `${params.title}_${params.query || ''}_${JSON.stringify(params.gscInsights)}`;
@@ -155,36 +274,12 @@ export async function generateBlogOutline(params: GenerateOutlineParams): Promis
     }
 
     const prompt = await generateOutlinePrompt(params);
-
-    const completion = await openai.beta.chat.completions.parse({
-      model: 'gpt-4o-mini-2024-07-18',
-      messages: [
-        { 
-          role: 'system', 
-          content: 'You are an expert content strategist and SEO specialist. Create detailed blog outlines that are data-driven, comprehensive, and optimized for both search engines and user intent.'
-        },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-      response_format: zodResponseFormat(BlogOutlineSchema, 'outline')
-    });
-
-    if (!completion.choices[0]?.message?.parsed?.outline) {
-      throw new Error('Invalid response format from OpenAI API');
-    }
-
-    const sections = completion.choices[0].message.parsed.outline;
     
-    const formattedSections = sections.map((section: z.infer<typeof OutlineSectionSchema>, index: number) => ({
-      id: `section-${index + 1}`,
-      title: section.title || 'Untitled Section',
-      keywords: section.keywords || [],
-      estimatedWordCount: section.wordCount || section.word_count || 300,
-      keyPoints: section.keyPoints || section.key_points || [],
-      sectionType: section.sectionType || section.section_type || 'body',
-      optimizationScore: section.optimizationScore || section.optimization_score || 70
-    }));
+    // Use the appropriate AI provider based on params or environment variable
+    const selectedProvider = params.provider || provider;
+    const formattedSections = selectedProvider === 'openai' 
+      ? await generateWithOpenAI(prompt)
+      : await generateWithGemini(prompt);
 
     outlineCache.set(cacheKey, {
       data: formattedSections,

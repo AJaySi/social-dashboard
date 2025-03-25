@@ -11,6 +11,7 @@ import SearchQuerySuggestions from './components/SearchQuerySuggestions';
 import CombinedResults from './components/CombinedResults';
 import ContentPreview from './components/ContentPreview';
 import ContentOutlineGenerator from './components/ContentOutlineGenerator';
+import LoadingState from './components/LoadingState';
 import { useRouter } from 'next/navigation';
 
 export default function Home() {
@@ -27,6 +28,8 @@ export default function Home() {
 
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
   const { data: session } = useSession();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showAskButton, setShowAskButton] = useState(false);
@@ -47,6 +50,23 @@ export default function Home() {
   const handleAskALwrity = async () => {
     try {
       setIsLoading(true);
+      setLoadingError(null);
+      setLoadingProgress(0);
+      
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev < 30) {
+            return prev + 5; // Initial processing
+          } else if (prev < 60) {
+            return prev + 3; // Analyzing content
+          } else if (prev < 85) {
+            return prev + 1; // Generating suggestions
+          }
+          return prev;
+        });
+      }, 300);
+      
       const response = await fetch('/api/suggestions/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -57,14 +77,20 @@ export default function Home() {
         throw new Error('Failed to get AI suggestions');
       }
 
+      // Set progress to 100% when we get the response
+      setLoadingProgress(100);
+      clearInterval(progressInterval);
+      
       const suggestions = await response.json();
       // Pass suggestions to the modal component
       setIsAskModalOpen(true);
       setIsLoading(false);
     } catch (error) {
       console.error('Error getting AI suggestions:', error);
+      setLoadingError('Failed to get AI suggestions. Please try again.');
       toast.error('Failed to get AI suggestions. Please try again.');
       setIsLoading(false);
+      setLoadingProgress(0);
     }
   };
 
@@ -187,13 +213,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-between mt-4">
-                <button
-                  onClick={() => router.push('/content-ideator')}
-                  className="flex items-center px-6 py-2 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-md hover:from-blue-500 hover:to-purple-500 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 mr-4"
-                >
-                  ALwrity Content AIdeator
-                </button>
+              <div className="flex justify-end mt-4">
                 {content.trim().length > 0 && (
                   <button
                     onClick={handleNextClick}
@@ -206,6 +226,7 @@ export default function Home() {
                   <button
                     onClick={handleAskALwrity}
                     className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-400 to-blue-600 text-white rounded-md hover:from-blue-500 hover:to-blue-700 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105 ml-auto"
+                    disabled={isLoading}
                   >
                     <Image
                       src="/favicon.ico"
@@ -214,8 +235,29 @@ export default function Home() {
                       height={20}
                       className="mr-2 opacity-90"
                     />
-                    Ask ALwrity
+                    {isLoading ? 'Processing...' : 'Ask ALwrity'}
                   </button>
+                )}
+                
+                {/* Loading State */}
+                {isLoading && (
+                  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl max-w-md w-full">
+                      <LoadingState 
+                        isLoading={isLoading} 
+                        error={loadingError}
+                        loadingMessage="Generating AI suggestions"
+                        progress={loadingProgress}
+                        tips={[
+                          'Analyzing your content...',
+                          'Searching for relevant topics...',
+                          'Generating title suggestions...',
+                          'Optimizing for engagement...',
+                          'Almost there! Finalizing results...'
+                        ]}
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

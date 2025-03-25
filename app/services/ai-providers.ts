@@ -5,8 +5,8 @@ if (!process.env.OPENAI_API_KEY) {
   console.warn('Warning: OPENAI_API_KEY environment variable is not configured. Some features may not work properly.');
 }
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('Warning: GEMINI_API_KEY environment variable is not configured. Some features may not work properly.');
+if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+  console.warn('Warning: NEXT_PUBLIC_GEMINI_API_KEY environment variable is not configured. Some features may not work properly.');
 }
 
 const openai = new OpenAI({
@@ -14,7 +14,7 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: true
 });
 
-const gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+const gemini = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
 interface GSCMetrics {
   clicks: number;

@@ -121,12 +121,16 @@ export async function POST(request: Request) {
         });
       }
       
+      // Get the provider from environment variable with openai as fallback
+      const provider = (process.env.DEFAULT_AI_PROVIDER || 'openai') as 'openai' | 'gemini';
+      
       outlineText = await generateBlogOutline({
         title,
         query,
         blogTitle,
         gscInsights: enhancedGscInsights,
-        serpData
+        serpData,
+        provider
       });
     } catch (outlineError: Error) {
       console.error('Error in generateBlogOutline:', outlineError);

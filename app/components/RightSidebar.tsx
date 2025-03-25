@@ -183,18 +183,25 @@ export default function RightSidebar({ insights, onRefresh, currentContent = '' 
       trigger={null}
     >
       <div className="p-4">
-        <div className="flex items-center justify-between mb-6 border-b border-gray-200/50 pb-3">
-          <div className="flex items-center space-x-2">
-            <h2 className="text-xl font-semibold text-blue-900">GSC Insights</h2>
-            <button
-              onClick={handleRefresh}
-              className={`p-1 text-blue-600 hover:text-blue-800 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
-              disabled={isRefreshing}
-            >
-              <SyncOutlined />
-            </button>
-          </div>
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col space-y-3 mb-6 border-b border-gray-200/50 pb-3">
+          <button
+            onClick={() => window.location.href = '/content-ideator'}
+            className="flex items-center justify-center w-full px-6 py-2 bg-gradient-to-r from-blue-400 to-purple-400 text-white rounded-md hover:from-blue-500 hover:to-purple-500 transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105"
+          >
+            ALwrity Content AIdeator
+          </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-semibold text-blue-900">GSC Insights</h2>
+              <button
+                onClick={handleRefresh}
+                className={`p-1 text-blue-600 hover:text-blue-800 transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+                disabled={isRefreshing}
+              >
+                <SyncOutlined />
+              </button>
+            </div>
+            <div className="flex items-center space-x-2">
             <button
               onClick={() => setIsContentAnalyzerModalOpen(true)}
               className="flex items-center px-2 py-1 text-blue-600 hover:text-blue-800 transition-colors"
@@ -215,6 +222,7 @@ export default function RightSidebar({ insights, onRefresh, currentContent = '' 
               />
               Ask ALwrity
             </button>
+            </div>
           </div>
         </div>
 

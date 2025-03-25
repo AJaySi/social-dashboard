@@ -79,20 +79,27 @@ export async function GET(request: Request) {
     } as webmasters_v3.Params$Resource$Searchanalytics$Query) as { data: webmasters_v3.Schema$SearchAnalyticsQueryResponse };
 
     // Fetch SERP data
-    const serpResponse = await fetch(
-      `https://serpapi.com/search.json?api_key=${SERPAPI_KEY}&engine=google&q=${encodeURIComponent(query)}&google_domain=google.com&gl=us&hl=en`,
-      {
-        headers: {
-          'Accept': 'application/json'
+    let serpData = null;
+    try {
+      const serpResponse = await fetch(
+        `https://serpapi.com/search.json?api_key=${SERPAPI_KEY}&engine=google&q=${encodeURIComponent(query)}&google_domain=google.com&gl=us&hl=en`,
+        {
+          headers: {
+            'Accept': 'application/json'
+          }
         }
+      );
+
+      if (!serpResponse.ok) {
+        console.warn(`SERP API returned status ${serpResponse.status}: ${serpResponse.statusText}`);
+        throw new Error('Failed to fetch SERP results');
       }
-    );
 
-    if (!serpResponse.ok) {
-      throw new Error('Failed to fetch SERP results');
+      serpData = await serpResponse.json();
+    } catch (serpError) {
+      console.error('SERP API error:', serpError);
+      // Continue with partial data - we'll handle this below
     }
-
-    const serpData = await serpResponse.json();
 
     // Combine GSC and SERP data
     const combinedInsights = {
@@ -109,7 +116,7 @@ export async function GET(request: Request) {
           position: row.position || 0
         })) || []
       },
-      serp_data: {
+      serp_data: serpData ? {
         organic_results: serpData.organic_results?.map((result: { position: number; title: string; link: string; snippet: string; displayed_link: string }) => ({
           position: result.position,
           title: result.title,
@@ -118,13 +125,22 @@ export async function GET(request: Request) {
           displayed_link: result.displayed_link
         })) || [],
         related_searches: serpData.related_searches || [],
+        related_questions: serpData.related_questions || [],
         total_results: serpData.search_metadata?.total_results
+      } : {
+        // Provide empty SERP data when API fails
+        organic_results: [],
+        related_searches: [],
+        related_questions: [],
+        total_results: 0
       },
       insights: {
-        ranking_gap: calculateRankingGap(searchAnalytics.rows ?? [], serpData.organic_results ?? []),
-        content_opportunities: identifyContentOpportunities(serpData.organic_results ?? [], searchAnalytics.rows ?? []),
-        competitor_analysis: analyzeCompetitors(serpData.organic_results ?? [])
-      }
+        ranking_gap: calculateRankingGap(searchAnalytics.rows ?? [], serpData?.organic_results ?? []),
+        content_opportunities: identifyContentOpportunities(serpData?.organic_results ?? [], searchAnalytics.rows ?? []),
+        competitor_analysis: analyzeCompetitors(serpData?.organic_results ?? [])
+      },
+      // Add a flag to indicate SERP data availability
+      serp_data_available: !!serpData
     };
 
     return new NextResponse(

@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession, signOut } from 'next-auth/react';
+import MetricsTicker from './MetricsTicker';
 
 export default function Header() {
   const { data: session } = useSession();
@@ -14,6 +15,7 @@ export default function Header() {
               Welcome, <span className="font-semibold">{session.user.name}</span>
             </p>
           )}
+          <MetricsTicker />
         </div>
         {session && (
           <button

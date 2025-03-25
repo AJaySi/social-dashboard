@@ -1,6 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
+import PricingPlans from '../../components/PricingPlans';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 
@@ -189,6 +190,26 @@ export default function LandingPage() {
                     <h3 className="text-lg font-semibold text-white mb-2">Real-time Insights</h3>
                     <p className="text-sm text-gray-300">SEO analytics and optimization</p>
                   </div>
+                </div>
+              </div>
+            </div>
+
+
+            <PricingPlans />
+
+            <div className="mt-24 relative overflow-hidden py-16 bg-gray-900 backdrop-blur-lg rounded-3xl shadow-lg border border-gray-700 transform hover:scale-[1.01] transition-all duration-300">
+              <div className="relative max-w-5xl mx-auto px-6">
+                <h2 className="text-4xl font-bold text-white mb-8 text-center">Join Our Community</h2>
+                <p className="text-xl text-gray-300 leading-relaxed mb-8 max-w-3xl mx-auto text-center">
+                  Connect with fellow content creators, share insights, and stay updated with the latest AI-powered content creation strategies.
+                </p>
+                <div className="flex justify-center space-x-6">
+                  <button
+                    onClick={() => window.location.href = '/welcome'}
+                    className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
+                  >
+                    <span className="text-lg font-semibold">Get Started</span>
+                  </button>
                 </div>
               </div>
             </div>
