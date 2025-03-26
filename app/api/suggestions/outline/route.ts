@@ -16,13 +16,13 @@ const limiter = rateLimit({
 
 interface GSCInsight {
   keyword: string;
-  metrics: {
+  metrics?: {
     clicks: number;
     impressions: number;
     ctr: number;
     position: number;
   };
-  type: string;
+  type: 'content_gap' | 'optimization_opportunity';
   title: string;
 }
 
@@ -92,7 +92,14 @@ export async function POST(request: Request) {
     // Generate outline using OpenAI with enhanced context
     let outlineText;
     try {
-      // Enhance gscInsights with search analytics data if available
+      // Validate gscInsights is an array and enhance with search analytics data
+      if (!Array.isArray(gscInsights)) {
+        return NextResponse.json(
+          { error: 'Invalid gscInsights format: expected an array' },
+          { status: 400 }
+        );
+      }
+
       const enhancedGscInsights = gscInsights.map((insight: GSCInsight) => ({
         keyword: insight.keyword,
         metrics: insight.metrics,
@@ -132,10 +139,11 @@ export async function POST(request: Request) {
         serpData,
         provider
       });
-    } catch (outlineError: Error) {
+    } catch (outlineError: unknown) {
       console.error('Error in generateBlogOutline:', outlineError);
+      const errorMessage = outlineError instanceof Error ? outlineError.message : 'Unknown error';
       return NextResponse.json(
-        { error: 'Failed to generate outline: ' + (outlineError.message || 'Unknown error') },
+        { error: 'Failed to generate outline: ' + errorMessage },
         { status: 500 }
       );
     }

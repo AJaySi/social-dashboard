@@ -352,6 +352,7 @@ export default function ContentOutlineGenerator({
       title: 'New Section',
       keywords: [],
       estimatedWordCount: 300,
+      sectionType: 'body', // Adding required sectionType property
       optimizationScore: 50 // Default score for new sections
     };
     setOutline([...outline, newSection]);

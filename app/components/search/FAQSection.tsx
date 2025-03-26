@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, List, Typography, Collapse } from 'antd';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 
@@ -8,13 +9,48 @@ type FAQSectionProps = {
     question: string;
     snippet: string;
   }>;
-  faqs?: Array<{
-    question: string;
-    answer: string;
-  }>;
+  relatedSearches?: Array<string | { query: string }>;
+  query?: string;
 };
 
-export default function FAQSection({ relatedQuestions, faqs }: FAQSectionProps) {
+export default function FAQSection({ relatedQuestions, relatedSearches = [], query }: FAQSectionProps) {
+  const [faqs, setFaqs] = useState<Array<{ question: string; answer: string }>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const generateFAQs = async () => {
+      if (!query) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch('/api/generate-faqs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            relatedQuestions,
+            relatedSearches,
+            query
+          })
+        });
+
+        if (!response.ok) throw new Error('Failed to generate FAQs');
+        
+        const generatedFaqs = await response.json();
+        setFaqs(generatedFaqs);
+      } catch (err) {
+        console.error('Error generating FAQs:', err);
+        setError(err instanceof Error ? err.message : 'Failed to generate FAQs');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generateFAQs();
+  }, [query, relatedQuestions, relatedSearches]);
+
   const { Title, Text } = Typography;
   const { Panel } = Collapse;
 

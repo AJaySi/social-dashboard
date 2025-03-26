@@ -1,6 +1,20 @@
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const openai = new OpenAI();
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('Warning: OPENAI_API_KEY environment variable is not configured. Some features may not work properly.');
+}
+
+if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+  console.warn('Warning: NEXT_PUBLIC_GEMINI_API_KEY environment variable is not configured. Some features may not work properly.');
+}
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+});
+
+const gemini = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || '');
 
 // Queue for managing content generation requests
 const requestQueue: Array<() => Promise<unknown>> = [];
@@ -66,7 +80,8 @@ export async function generateSectionContent(
   keywords: string[] = [],
   type: string,
   context?: string,
-  personalizationPreferences?: ContentPersonalizationPreferences
+  personalizationPreferences?: ContentPersonalizationPreferences,
+  provider: 'openai' | 'gemini' = 'openai'
 ) {
   const generateContent = async () => {
     // Build personalization instructions if preferences are provided
@@ -92,17 +107,39 @@ export async function generateSectionContent(
     
     Generate the content now:`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
-      messages: [
-        { role: 'system', content: 'You are a professional content writer skilled in creating engaging, SEO-optimized content.' },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 1000
-    });
+    try {
+      if (provider === 'openai') {
+        try {
+          const completion = await openai.chat.completions.create({
+            model: 'gpt-4',
+            messages: [
+              { role: 'system', content: 'You are a professional content writer skilled in creating engaging, SEO-optimized content.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 1000
+          });
 
-    return completion.choices[0]?.message?.content || '';
+          return completion.choices[0]?.message?.content || '';
+        } catch (openaiError: any) {
+          console.warn('OpenAI generation failed, falling back to Gemini:', openaiError.message);
+          provider = 'gemini';
+        }
+      }
+      
+      // Fallback to Gemini or direct Gemini usage
+      const model = gemini.getGenerativeModel({
+        model: 'gemini-pro',
+        systemInstruction: 'You are a professional content writer skilled in creating engaging, SEO-optimized content.'
+      });
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } catch (error: any) {
+      console.error('Content generation failed:', error);
+      throw new Error(`Content generation failed: ${error.message}`);
+    }
   };
 
   return new Promise((resolve, reject) => {
